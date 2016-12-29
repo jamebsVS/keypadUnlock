@@ -1,0 +1,210 @@
+#include <LiquidCrystal.h>  //insert LCD library - found on the Arduino website
+#include <Keypad.h>         //insert keypad library - courtesy of Mark Stanley & Alexander Brevig. http://playground.arduino.cc/Code/Keypad#Functions
+#include <EEPROM.h>         //insert EEPROM library for hard memory of passcodes - found on the arduino website
+
+//-----------------------for LCD stuff----------------------//
+LiquidCrystal LCD(2,8,4,5,6,7);       //sets the display up 
+const int brightnessPin = 3;          //sets the pin number used for brightness
+int x = 0;                            //creates the integer x which is used for getting the LCD functions to perform once and only once
+
+
+//-----------------keypad stuff----------------------------//
+const byte ROWS = 4; //four rows
+const byte COLS = 3; //three columns
+char keys[ROWS][COLS] = {
+  {'1','2','3'},
+  {'4','5','6'},
+  {'7','8','9'},
+  {'*','0','#'}
+};
+byte rowPins[ROWS] = {A1, A2, A3, A4}; //connect to the row pinouts of the keypad
+byte colPins[COLS] = {9, 10, 11};      //connect to the column pinouts of the keypad
+
+char key1;      // 
+char key2;      //
+char key3;      //
+char key4;      // declare character variables for keys.
+
+Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
+
+//--------------------------for the lock-------------------//
+const int lockSol = 12;       //sets pin 12 as the control pin for the electric strike
+int period = 2000;            //period being the time required to hold the lockSol open
+
+//--------------------miscellaneous--------------------------//
+int resetButton = A0;       //sets analogue pin 0 as the password reset button
+char code1;           //
+char code2;           //
+char code3;           //
+char code4;           //initialises the variables for the 4 digit code
+
+unsigned long ms;                 // create variable to store millis();
+unsigned long currentMs;          // create variable to store difference in ms
+unsigned long timeout = 10000;    // creates variable to store value for how long to wait for keypad entry (in milliseconds)
+int y = 0;                        // creates variable for skipping functions for keypad entry sequence.
+
+
+
+void setup() {
+  code1 = EEPROM.read(0);             //
+  code2 = EEPROM.read(1);             //
+  code3 = EEPROM.read(2);             //
+  code4 = EEPROM.read(3);             // read the 4 digit code stored in the EEPROM (to keep memory when unit is turned off)
+  
+  LCD.begin(16,2);                    // dictates the size of the LCD 
+  pinMode(brightnessPin, OUTPUT);     // sets the brightness control pin as an output
+  digitalWrite(brightnessPin,HIGH);          //set the brightness 
+  pinMode(lockSol, OUTPUT);                  //set the lockSol pin as an output
+  pinMode(resetButton, INPUT_PULLUP);        //set the password reset pin as an input with pullup resistor active
+  digitalWrite(lockSol, LOW);                //ensure that the door remains locked
+  standBy();                                 //write the standby screen
+  delay(1000);                               //wait a bit
+  int waffle = digitalRead(resetButton);
+  if (waffle == LOW) {      // if the reset password button is pressed
+    digitalWrite(brightnessPin, HIGH);
+    LCD.clear();                 // clear the LCD
+    newCode1();                   // print the newCode? screen
+    char nay = keypad.waitForKey();                      // nay is someshit I don't even know what I'm doing now. 
+    if (nay == '*') {
+      LCD.clear();                                       // clear the LCD
+      newCode2();                                        // write the passCode screen
+      char key1 = keypad.waitForKey();                   // wait for the next key entry
+      LCD.setCursor(6,1);                                
+      LCD.print(key1);                                   //write it on the LCD
+      char key2 = keypad.waitForKey();                   //repeat for next key
+      LCD.setCursor(7,1);
+      LCD.print(key2);
+      char key3 = keypad.waitForKey();
+      LCD.setCursor(8,1);
+      LCD.print(key3);
+      char key4 = keypad.waitForKey();
+      LCD.setCursor(9,1);
+      LCD.print(key4);                                   //----------end of keypad entry routine------------------//
+      code1 = key1;              //
+      code2 = key2;              //
+      code3 = key3;              //
+      code4 = key4;              // New code is now saved in variables
+      EEPROM.update(0,code1);    //
+      EEPROM.update(1,code2);    //
+      EEPROM.update(2,code3);    //
+      EEPROM.update(3,code4);    // new code is now saved in EEPROM memory
+      delay(500);
+      x=0;                   // make x=0 again so the standby routine will start again
+    }
+    else if (nay == '#') {
+     delay(500); // do nothing and continue back to the start of the main loop
+     x=0;        // make x=0 again so the standby routine will start again
+    }
+  }
+}
+
+void loop() {
+  start:                                               // label for goto.
+  
+  key1=NO_KEY;                                         //
+  key2=NO_KEY;                                         //
+  key3=NO_KEY;                                         //
+  key4=NO_KEY;                                         //clear keypad values
+  
+  while (x<1) {                                        // Do this once
+  LCD.clear();                                         // clear the LCD
+  standBy();                                           // print the standBy screen
+  delay(1000);                                          //test to see how the lcd reacts when it is given a bit of time before it turns off
+  digitalWrite(brightnessPin,LOW);                     // turn off the LCD backlight
+  ++x;                                                 // add 1 to x so this while loop is performed ONCE
+  }
+  char weyt = keypad.getKey();                         // weyt (this is wait + key) is used for waking up the LCD
+  
+  if (weyt != NO_KEY) {                                // if any key is pressed
+    digitalWrite(brightnessPin,HIGH);                  // turn on the LCD backlight
+    delay(500);                                        // wait a bit for the LCD to stabilise
+    LCD.clear();                                       // clear the LCD
+    passCode();                                        // write the passCode screen
+
+
+//------perform the routine for entering keypad values----//
+
+    currentMs = millis();                          // store value of millis
+    ms = currentMs+timeout;                        // add some time to current millis and store it as ms (for time out of keypad entry)
+
+    while (currentMs < ms && key1 == NO_KEY) {     //while currentMs has not exceeded ms and no key has been pressed
+    key1 = keypad.getKey();                        //get the next key entry
+    currentMs = millis();                          //update current millis
+    }
+    if (currentMs >= ms && key1 == NO_KEY) {       //if currentMs exceeds ms and no key has been pressed
+     x=0;                                          //let x be 0 so the standby screen routine can be performed &
+     goto start;                                   //go to the start of the loop
+     }
+    else{    
+    LCD.setCursor(6,1);                            //set the appropriate cursor position
+    LCD.print(key1);                               //write it on the LCD
+    }
+    
+    currentMs = millis();                          //repeat for key2
+    ms = currentMs+timeout;                        //
+                                                   //
+    while (currentMs < ms && key2 == NO_KEY) {     //
+    key2 = keypad.getKey();                        //
+    currentMs = millis();                          //
+    }                                              //
+    if (currentMs >= ms && key2 == NO_KEY) {       //
+     x=0;                                          //
+     goto start;                                   //
+     }                                             //
+    else{                                          //
+    LCD.setCursor(7,1);                            //
+    LCD.print(key2);                               //
+    }                                              //
+
+    currentMs = millis();                          //repeat for key3
+    ms = currentMs+timeout;                        //
+                                                   //
+    while (currentMs < ms && key3 == NO_KEY) {     //
+    key3 = keypad.getKey();                        //
+    currentMs = millis();                          //
+    }                                              //
+    if (currentMs >= ms && key3 == NO_KEY) {       //
+     x=0;                                          //
+     goto start;                                   //
+     }                                             //
+    else{                                          //
+    LCD.setCursor(8,1);                            //
+    LCD.print(key3);                               //
+    }                                              //
+
+
+    currentMs = millis();                          //repeat for key4
+    ms = currentMs+timeout;                        //
+                                                   //
+    while (currentMs < ms && key4 == NO_KEY) {     //
+    key4 = keypad.getKey();                        //
+    currentMs = millis();                          //
+    }                                              //
+    if (currentMs >= ms && key4 == NO_KEY) {       //
+     x=0;                                          //
+     goto start;                                   //
+     }                                             //
+    else{                                          //
+    LCD.setCursor(9,1);                            //
+    LCD.print(key4);                               //
+    }                                              //
+   
+    //----------end of keypad entry routine------------------//
+  
+      delay(1000);
+      if ((key1 == code1) && (key2 == code2) && (key3 == code3) && (key4 == code4)) {    // if the passcode entered is the same as the set passcode
+          LCD.clear();                                                                   //
+          welcome();                                                                     //
+          digitalWrite(lockSol, HIGH);                                                   // unlock the electric door strike
+          delay(period);                                                                 // wait a bit
+          digitalWrite(lockSol, LOW);                                                    // lock the electric door strike
+          delay(500);
+          x=0;                                                                           // let x return to 0 so the standBy screen can be done again
+            } else {                  // if anything but the correct code is entered
+            LCD.clear();              //
+            denied();                 // print the denied screen
+            delay(600);               // wait a moment
+            x = 0;                    // let x return to 0 so the standBy screen can be done again
+            }
+  }
+}
