@@ -1,0 +1,38 @@
+
+void standBy() {
+  LCD.setCursor(4,0);
+  LCD.print("STAND BY");
+  LCD.setCursor(6,1);
+  LCD.print("MODE");
+}
+
+void welcome() {
+  LCD. setCursor(4,0);
+  LCD.print("WELCOME");
+  LCD.setCursor(1,1);
+  LCD.print("ACCESS GRANTED");
+}
+
+void denied() {
+  LCD.setCursor(5,0);
+  LCD.print("ACCESS");
+  LCD.setCursor(4,1);
+  LCD.print("DENIED!!");
+}
+
+void passCode() {
+  LCD.setCursor(1,0);
+  LCD.print("ENTER PASSCODE");
+}
+
+void newCode1() {
+  LCD.setCursor(2,0);
+  LCD.print("NEW PASSCODE?");
+  LCD.setCursor(0,1);
+  LCD.print("*=YES       #=NO");
+}
+
+void newCode2() {
+  LCD.setCursor(2,0);
+  LCD.print("NEW PASSCODE");
+}
